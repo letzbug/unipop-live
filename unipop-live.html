@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>UniPop Live</title>
+<style>
+  :root{--bg:#eef6f9;--txt:#082b49;--ok:#e60000}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  .wrap{max-width:1200px;margin:0 auto;padding:16px}
+  .hdr{display:flex;gap:.5rem;align-items:baseline;flex-wrap:wrap}
+  .label{font-weight:600}
+  .count{font-variant-numeric:tabular-nums;letter-spacing:.5px}
+  .hdr.upcoming{background:#eef6ff;padding:10px;border-radius:12px}
+  .hdr.live{background:#eaf9ef;padding:10px;border-radius:12px}
+  .hdr.ended{background:#f2f2f2;padding:10px;border-radius:12px}
+  .outer{margin-top:10px}
+  .aspect{position:relative;width:100%;aspect-ratio:16/9;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.08);background:#000}
+  .poster,.player{position:absolute;inset:0}
+  .poster{background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center}
+  .hidden{display:none!important}
+  .badge{position:absolute;top:12px;left:12px;background:var(--ok);color:#fff;padding:.25rem .5rem;border-radius:999px;font-size:.85rem;font-weight:700;letter-spacing:.3px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="hdr" class="hdr upcoming" role="status" aria-live="polite">
+    <span id="label" class="label">Live stream démarre dans</span>
+    <span id="count" class="count">--:--:--</span>
+  </div>
+
+  <div class="outer">
+    <div class="aspect">
+      <div id="badge" class="badge hidden">EN DIRECT</div>
+      <div id="poster" class="poster" role="img" aria-label="Affiche du live"></div>
+      <div id="player" class="player hidden"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ---- URL-Parameter: ?video=XXXX&start=2025-11-29T19:00:00+01:00&poster=https://… ----
+  const p = new URLSearchParams(location.search);
+  const VIDEO_ID = p.get('video') || '';
+  const ISO_START = p.get('start') || '';
+  const POSTER = p.get('poster') || '';
+
+  const hdr = document.getElementById('hdr');
+  const labelEl = document.getElementById('label');
+  const countEl = document.getElementById('count');
+  const posterEl = document.getElementById('poster');
+  const playerEl = document.getElementById('player');
+  const badgeEl = document.getElementById('badge');
+
+  if(POSTER) posterEl.style.backgroundImage = 'url("'+POSTER+'")';
+
+  const startTime = ISO_START ? new Date(ISO_START) : null;
+
+  function setState(state){
+    hdr.classList.remove('upcoming','live','ended');
+    hdr.classList.add(state);
+  }
+  function showPoster(){
+    posterEl.classList.remove('hidden');
+    playerEl.classList.add('hidden');
+    badgeEl.classList.add('hidden');
+  }
+  function showPlayer(){
+    posterEl.classList.add('hidden');
+    playerEl.classList.remove('hidden');
+    badgeEl.classList.remove('hidden');
+  }
+  function two(n){return String(n).padStart(2,'0')}
+  function fmt(ms){
+    if(ms<0) ms=0;
+    const s=Math.floor(ms/1000);
+    const d=Math.floor(s/86400);
+    const h=Math.floor((s%86400)/3600);
+    const m=Math.floor((s%3600)/60);
+    const sec=s%60;
+    return (d>0?d+'j ':'')+two(h)+':'+two(m)+':'+two(sec);
+  }
+
+  function tick(){
+    if(!startTime){ setState('live'); labelEl.textContent='En direct'; countEl.textContent=''; return; }
+    const diff = +startTime - +new Date();
+    if(diff>0){
+      setState('upcoming'); labelEl.textContent='Live stream démarre dans'; countEl.textContent=fmt(diff); showPoster();
+    }else{
+      setState('live'); labelEl.textContent='En direct'; countEl.textContent=''; showPlayer();
+    }
+  }
+
+  // YT API laden
+  function loadYT(){
+    if(window.YT && window.YT.Player){ initYT(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(s);
+    window.onYouTubeIframeAPIReady = initYT;
+  }
+  let player;
+  function initYT(){
+    player = new YT.Player('player',{
+      videoId: VIDEO_ID,
+      playerVars:{autoplay:0,rel:0,playsinline:1,modestbranding:1},
+      events:{onReady:onReady,onStateChange:onState}
+    });
+  }
+  function onReady(){
+    tick();
+  }
+  function onState(e){
+    const S = YT.PlayerState;
+    if(e.data===S.PLAYING||e.data===S.BUFFERING){ setState('live'); labelEl.textContent='En direct'; countEl.textContent=''; showPlayer(); }
+    if(e.data===S.ENDED){ setState('ended'); labelEl.textContent='Live stream terminé — merci !'; countEl.textContent=''; showPoster(); }
+  }
+
+  // Start
+  tick();
+  setInterval(tick,1000);
+  loadYT();
+})();
+</script>
+</body>
+</html>
