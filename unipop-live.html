@@ -1,40 +1,12 @@
-<!doctype html>
-<html lang="fr">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>UniPop Live</title>
-<style>
-  html,body{margin:0;padding:0;overflow:hidden;background:#eef6f9;color:#082b49;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
-  .stage{position:relative;width:100vw;max-width:1200px;margin:0 auto}
-  .ratio{position:relative;width:100%;padding-top:56.25%;border-radius:16px;overflow:hidden;background:#000}
-  .badge{position:absolute;top:12px;left:12px;background:#e60000;color:#fff;padding:.25rem .5rem;border-radius:999px;font-size:.85rem;font-weight:700;letter-spacing:.3px}
-  .bar{position:absolute;top:12px;right:12px;background:rgba(255,255,255,.9);color:#082b49;padding:.35rem .6rem;border-radius:10px;font-weight:600;font-variant-numeric:tabular-nums}
-  .poster,.player{position:absolute;inset:0}
-  .poster{background:#000 center/contain no-repeat}
-  .hidden{display:none!important}
-  iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
-</style>
-</head>
-<body>
-  <div class="stage">
-    <div class="ratio">
-      <div id="badge" class="badge hidden">EN DIRECT</div>
-      <div id="bar" class="bar"><span id="label">Live stream démarre dans</span> <span id="count">--:--:--</span></div>
-      <div id="poster" class="poster" role="img" aria-label="Affiche du live"></div>
-      <div id="playerBox" class="player hidden"></div>
-    </div>
-  </div>
-
 <script>
 (function(){
   const qs = new URLSearchParams(location.search);
   const VIDEO_ID = qs.get('video') || '';
   const ISO_START = qs.get('start') || '';
   const POSTER = qs.get('poster') || '';
-  const AUTOPLAY = qs.get('autoplay') === '1';     // ?autoplay=1
-  const MUTE = qs.get('mute') !== '0';             // default muted
-  const PREROLL = Math.max(0, parseInt(qs.get('preroll')||'3000', 10)); // ms, default 3000
+  const AUTOPLAY = qs.get('autoplay') === '1';
+  const MUTE = qs.get('mute') !== '0';
+  const PREROLL = Math.max(0, parseInt(qs.get('preroll') || '3000'));
 
   const badge = document.getElementById('badge');
   const labelEl = document.getElementById('label');
@@ -42,32 +14,34 @@
   const posterEl = document.getElementById('poster');
   const playerBox = document.getElementById('playerBox');
 
-  if (POSTER) posterEl.style.backgroundImage = 'url("'+POSTER+'")';
+  let startTime = ISO_START ? new Date(ISO_START) : null;
+  let player, endedForever = false;
 
-  const startTime = ISO_START ? new Date(ISO_START) : null;
-  let player, triedToPlay = false, endedForever = false, prerollTimer;
+  if (POSTER) posterEl.style.backgroundImage = `url("${POSTER}")`;
+
+  function showPoster(){ posterEl.classList.remove('hidden'); playerBox.classList.add('hidden'); badge.classList.add('hidden'); }
+  function showPlayer(){ posterEl.classList.add('hidden'); playerBox.classList.remove('hidden'); badge.classList.remove('hidden'); }
+  function setLiveUI(){ labelEl.textContent='En direct'; countEl.textContent=''; }
+  function setUpcoming(ms){ labelEl.textContent='Live stream démarre dans'; countEl.textContent=ms; showPoster(); }
+  function setEnded(){ labelEl.textContent='Live stream terminé — merci !'; countEl.textContent=''; showPoster(); endedForever = true; }
 
   function two(n){return String(n).padStart(2,'0')}
   function fmt(ms){
-    if(ms<0) ms=0; const s=Math.floor(ms/1000), d=Math.floor(s/86400);
+    if(ms<0) ms=0;
+    const s=Math.floor(ms/1000), d=Math.floor(s/86400);
     const h=Math.floor((s%86400)/3600), m=Math.floor((s%3600)/60), sec=s%60;
     return (d>0?d+'j ':'')+two(h)+':'+two(m)+':'+two(sec);
   }
-  function showPoster(){ posterEl.classList.remove('hidden'); playerBox.classList.add('hidden'); badge.classList.add('hidden'); }
-  function showPlayer(){ posterEl.classList.add('hidden'); playerBox.classList.remove('hidden'); badge.classList.remove('hidden'); }
-  function setUpcoming(ms){ labelEl.textContent='Live stream démarre dans'; countEl.textContent=fmt(ms); showPoster(); }
-  function setLive(){ labelEl.textContent='En direct'; countEl.textContent=''; /* Sichtbarkeit wird erst bei PLAYING umgeschaltet */ }
-  function setEnded(){ labelEl.textContent='Live stream terminé — merci !'; countEl.textContent=''; showPoster(); endedForever = true; }
 
   function tick(){
-    if(endedForever) return; // Poster bleiben lassen
-    if(!startTime){ setLive(); return; }
+    if(endedForever) return;
+    if(!startTime){ setLiveUI(); return; }
     const diff = startTime - new Date();
-    if(diff>0){ setUpcoming(diff); }
-    else { setLive(); /* Poster bleibt bis wir wirklich PLAYING sind */ }
+    if(diff>0){ setUpcoming(fmt(diff)); }
+    else { setLiveUI(); }
   }
 
-  function ensureYT(){
+  function loadYT(){
     if(window.YT && window.YT.Player){ initYT(); return; }
     const s=document.createElement('script'); s.src='https://www.youtube.com/iframe_api';
     document.head.appendChild(s);
@@ -77,52 +51,34 @@
   function initYT(){
     player = new YT.Player('playerBox',{
       videoId: VIDEO_ID,
-      playerVars:{autoplay:0, rel:0, playsinline:1, modestbranding:1, mute: MUTE?1:0},
+      playerVars:{autoplay:0, playsinline:1, rel:0, modestbranding:1, mute:MUTE?1:0},
       events:{onReady:onReady, onStateChange:onState}
     });
   }
 
   function onReady(){
-    try{ if(MUTE && player.mute) player.mute(); }catch(e){}
-    // Poster immer zuerst zeigen, dann nach PREROLL versuchen zu spielen:
-    if(AUTOPLAY){
-      clearTimeout(prerollTimer);
-      prerollTimer = setTimeout(()=>{
-        triedToPlay = true;
-        try{ player.playVideo && player.playVideo(); }catch(e){}
-      }, PREROLL);
-    }
+    if(MUTE && player.mute) player.mute();
+    // Start video only after preroll
+    setTimeout(()=>{
+      if(AUTOPLAY && player.playVideo){
+        player.playVideo();
+      }
+      showPlayer();
+    }, PREROLL);
   }
 
   function onState(e){
     const S = YT.PlayerState;
-    if(e.data===S.PLAYING || e.data===S.BUFFERING){
-      setLive(); showPlayer(); // Player nur sichtbar, wenn wirklich spielt
-    }
-    if(e.data===S.ENDED){
-      setEnded(); // Danach dauerhaft Poster bis neuer Stream
-    }
-    if(e.data===S.UNSTARTED){
-      // Falls VOD gesperrt/kein Live → Player NICHT zeigen, auf Poster bleiben
-      if(triedToPlay){ showPoster(); }
+    if(e.data === S.ENDED){
+      setEnded();
     }
   }
 
-  // Start
-  showPoster();  // immer zuerst Poster
+  showPoster();
   tick();
   setInterval(tick,1000);
 
-  // YT erst laden, wenn entweder Start erreicht ist oder Autoplay generell gewünscht:
-  if (!startTime || (startTime && new Date() >= startTime) || AUTOPLAY) {
-    ensureYT();
-  } else {
-    // Vor Start: warte bis Start erreicht, dann YT laden (spart Ressourcen)
-    const watch = setInterval(()=>{
-      if(new Date() >= startTime){ clearInterval(watch); ensureYT(); }
-    }, 1000);
-  }
+  // Load YT immediately (so buffering happens under poster)
+  loadYT();
 })();
 </script>
-</body>
-</html>
