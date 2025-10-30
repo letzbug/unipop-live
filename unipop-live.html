@@ -15,13 +15,12 @@
   const playerBox = document.getElementById('playerBox');
 
   let startTime = ISO_START ? new Date(ISO_START) : null;
-  let player, endedForever = false, prerollDone = false, videoIsPlaying = false;
+  let player, endedForever = false;
 
   if (POSTER) posterEl.style.backgroundImage = `url("${POSTER}")`;
 
   function showPoster(){ posterEl.classList.remove('hidden'); playerBox.classList.add('hidden'); badge.classList.add('hidden'); }
   function showPlayer(){ posterEl.classList.add('hidden'); playerBox.classList.remove('hidden'); badge.classList.remove('hidden'); }
-
   function setLiveUI(){ labelEl.textContent='En direct'; countEl.textContent=''; }
   function setUpcoming(ms){ labelEl.textContent='Live stream démarre dans'; countEl.textContent=ms; showPoster(); }
   function setEnded(){ labelEl.textContent='Live stream terminé — merci !'; countEl.textContent=''; showPoster(); endedForever = true; }
@@ -38,8 +37,8 @@
     if(endedForever) return;
     if(!startTime){ setLiveUI(); return; }
     const diff = startTime - new Date();
-    if(diff>0) setUpcoming(fmt(diff));
-    else setLiveUI();
+    if(diff>0){ setUpcoming(fmt(diff)); }
+    else { setLiveUI(); }
   }
 
   function loadYT(){
@@ -52,40 +51,34 @@
   function initYT(){
     player = new YT.Player('playerBox',{
       videoId: VIDEO_ID,
-      playerVars:{autoplay:0, playsinline:1, rel:0, modestbranding:1, controls:0, mute:MUTE?1:0},
+      playerVars:{autoplay:0, playsinline:1, rel:0, modestbranding:1, mute:MUTE?1:0},
       events:{onReady:onReady, onStateChange:onState}
     });
   }
 
-  function tryStartVideo(){
-    if(AUTOPLAY && player && player.playVideo){
-      try { player.playVideo(); } catch(e){}
-    }
-  }
-
   function onReady(){
     if(MUTE && player.mute) player.mute();
+    // Start video only after preroll
     setTimeout(()=>{
-      prerollDone = true;
-      tryStartVideo();
-      if(videoIsPlaying) showPlayer();
+      if(AUTOPLAY && player.playVideo){
+        player.playVideo();
+      }
+      showPlayer();
     }, PREROLL);
   }
 
   function onState(e){
     const S = YT.PlayerState;
-    
-    if(e.data === S.PLAYING){
-      videoIsPlaying = true;
-      if(prerollDone) showPlayer();
+    if(e.data === S.ENDED){
+      setEnded();
     }
-
-    if(e.data === S.ENDED) setEnded();
   }
 
   showPoster();
   tick();
   setInterval(tick,1000);
+
+  // Load YT immediately (so buffering happens under poster)
   loadYT();
 })();
 </script>
