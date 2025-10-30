@@ -1,45 +1,47 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>UniPop Live</title>
+<style>
+  html,body{margin:0;padding:0;overflow:hidden;background:#eef6f9;color:#082b49;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  .stage{position:relative;width:100vw;max-width:1200px;margin:0 auto}
+  .ratio{position:relative;width:100%;padding-top:56.25%;border-radius:16px;overflow:hidden;background:#000}
+  .badge{position:absolute;top:12px;left:12px;background:#e60000;color:#fff;padding:.25rem .5rem;border-radius:999px;font-size:.85rem;font-weight:700;letter-spacing:.3px}
+  .poster,.player{position:absolute;inset:0}
+  .poster{background:#000 center/contain no-repeat}
+  .hidden{display:none!important}
+  iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="ratio">
+      <div id="badge" class="badge">EN DIRECT</div>
+      <div id="poster" class="poster"></div>
+      <div id="playerBox" class="player hidden"></div>
+    </div>
+  </div>
+
 <script>
 (function(){
   const qs = new URLSearchParams(location.search);
   const VIDEO_ID = qs.get('video') || '';
-  const ISO_START = qs.get('start') || '';
   const POSTER = qs.get('poster') || '';
   const AUTOPLAY = qs.get('autoplay') === '1';
   const MUTE = qs.get('mute') !== '0';
-  const PREROLL = Math.max(0, parseInt(qs.get('preroll') || '3000')); // ms
+  const PREROLL = Math.max(0, parseInt(qs.get('preroll') || '3000'));
 
-  const badge = document.getElementById('badge');
-  const labelEl = document.getElementById('label');
-  const countEl = document.getElementById('count');
   const posterEl = document.getElementById('poster');
   const playerBox = document.getElementById('playerBox');
 
-  let startTime = ISO_START ? new Date(ISO_START) : null;
-  let player, prerollDone = false, endedForever = false;
-  let watchdogInt = null;
-
   if (POSTER) posterEl.style.backgroundImage = `url("${POSTER}")`;
 
-  function showPoster(){ posterEl.classList.remove('hidden'); playerBox.classList.add('hidden'); badge.classList.add('hidden'); }
-  function showPlayer(){ posterEl.classList.add('hidden'); playerBox.classList.remove('hidden'); badge.classList.remove('hidden'); }
-  function setLiveUI(){ labelEl.textContent='En direct'; countEl.textContent=''; }
-  function setUpcoming(ms){ labelEl.textContent='Live stream démarre dans'; countEl.textContent=ms; showPoster(); }
-  function setEnded(){ labelEl.textContent='Live stream terminé — merci !'; countEl.textContent=''; showPoster(); endedForever = true; }
+  let player;
 
-  function two(n){return String(n).padStart(2,'0')}
-  function fmt(ms){
-    if(ms<0) ms=0;
-    const s=Math.floor(ms/1000), d=Math.floor(s/86400);
-    const h=Math.floor((s%86400)/3600), m=Math.floor((s%3600)/60), sec=s%60;
-    return (d>0?d+'j ':'')+two(h)+':'+two(m)+':'+two(sec);
-  }
-
-  function tick(){
-    if(endedForever) return;
-    if(!startTime){ setLiveUI(); return; }
-    const diff = startTime - new Date();
-    if(diff>0) setUpcoming(fmt(diff)); else setLiveUI();
-  }
+  function showPoster(){ posterEl.classList.remove('hidden'); playerBox.classList.add('hidden'); }
+  function showPlayer(){ posterEl.classList.add('hidden'); playerBox.classList.remove('hidden'); }
 
   function loadYT(){
     if(window.YT && window.YT.Player){ initYT(); return; }
@@ -56,62 +58,23 @@
     });
   }
 
-  function startWatchdog(){
-    // Prüft bis zu 6s im 100-ms-Raster auf tatsächliches PLAYING, sonst Poster lassen
-    let elapsed = 0;
-    clearInterval(watchdogInt);
-    watchdogInt = setInterval(()=>{
-      if (!player || typeof player.getPlayerState !== 'function') return;
-      const S = YT.PlayerState;
-      const st = player.getPlayerState();
-      if (st === S.PLAYING) {
-        showPlayer(); clearInterval(watchdogInt);
-      } else {
-        // solange nicht PLAYING -> Poster sichtbar halten
-        showPoster();
-      }
-      elapsed += 100;
-      if (elapsed >= 6000) { // Fallback: nach 6s erneut play versuchen
-        try { player.playVideo(); } catch(e){}
-        elapsed = 0;
-      }
-    }, 100);
-  }
-
   function onReady(){
-    // 1) Poster zuerst stehen lassen
-    showPoster();
-    // 2) Nach PREROLL Autoplay versuchen (muted)
+    // Poster stays 3 seconds, THEN video attempts autoplay
     setTimeout(()=>{
-      prerollDone = true;
-      try { if(MUTE && player.mute) player.mute(); } catch(e){}
-      if (AUTOPLAY && player && player.playVideo) {
-        try { player.playVideo(); } catch(e){}
-      }
-      // 3) Watchdog prüft, ob wirklich PLAYING -> erst dann Poster weg
-      startWatchdog();
+      try{ if(MUTE && player.mute) player.mute(); player.playVideo(); }catch(e){}
     }, PREROLL);
   }
 
   function onState(e){
     const S = YT.PlayerState;
-    if(e.data === S.PLAYING){
-      // Bestätigung: jetzt wirklich Video zeigen
-      if (prerollDone) showPlayer();
-    }
-    if(e.data === S.BUFFERING || e.data === S.UNSTARTED){
-      // niemals Schwarz zeigen -> Poster oben halten
-      showPoster();
-    }
-    if(e.data === S.ENDED){
-      setEnded();
-    }
+    if(e.data === S.PLAYING){ showPlayer(); }
+    if(e.data === S.BUFFERING || e.data === S.UNSTARTED){ showPoster(); }
+    if(e.data === S.ENDED){ showPoster(); }
   }
 
-  // Start
   showPoster();
-  tick();
-  setInterval(tick,1000);
   loadYT();
 })();
 </script>
+</body>
+</html>
