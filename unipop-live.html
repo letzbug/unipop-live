@@ -14,18 +14,12 @@
   const posterEl = document.getElementById('poster');
   const playerBox = document.getElementById('playerBox');
 
-  let startTime = ISO_START ? new Date(ISO_START) : null;
-  let player, endedForever = false;
-
   if (POSTER) posterEl.style.backgroundImage = `url("${POSTER}")`;
 
-  function showPoster(){ posterEl.classList.remove('hidden'); playerBox.classList.add('hidden'); badge.classList.add('hidden'); }
-  function showPlayer(){ posterEl.classList.add('hidden'); playerBox.classList.remove('hidden'); badge.classList.remove('hidden'); }
-  function setLiveUI(){ labelEl.textContent='En direct'; countEl.textContent=''; }
-  function setUpcoming(ms){ labelEl.textContent='Live stream démarre dans'; countEl.textContent=ms; showPoster(); }
-  function setEnded(){ labelEl.textContent='Live stream terminé — merci !'; countEl.textContent=''; showPoster(); endedForever = true; }
+  let startTime = ISO_START ? new Date(ISO_START) : null;
+  let player, prerollTimer, hasStarted = false, endedForever = false;
 
-  function two(n){return String(n).padStart(2,'0')}
+  function two(n){return String(n).padStart(2,'0');}
   function fmt(ms){
     if(ms<0) ms=0;
     const s=Math.floor(ms/1000), d=Math.floor(s/86400);
@@ -33,15 +27,22 @@
     return (d>0?d+'j ':'')+two(h)+':'+two(m)+':'+two(sec);
   }
 
+  function showPoster(){ posterEl.classList.remove('hidden'); playerBox.classList.add('hidden'); badge.classList.add('hidden'); }
+  function showPlayer(){ posterEl.classList.add('hidden'); playerBox.classList.remove('hidden'); badge.classList.remove('hidden'); }
+
+  function setUpcoming(ms){ labelEl.textContent='Live stream démarre dans'; countEl.textContent=fmt(ms); showPoster(); }
+  function setLive(){ labelEl.textContent='En direct'; countEl.textContent=''; }
+  function setEnded(){ labelEl.textContent='Live stream terminé — merci !'; countEl.textContent=''; showPoster(); endedForever = true; }
+
   function tick(){
     if(endedForever) return;
-    if(!startTime){ setLiveUI(); return; }
+    if(!startTime){ setLive(); return; }
     const diff = startTime - new Date();
-    if(diff>0){ setUpcoming(fmt(diff)); }
-    else { setLiveUI(); }
+    if(diff>0) setUpcoming(diff);
+    else setLive(); 
   }
 
-  function loadYT(){
+  function ensureYT(){
     if(window.YT && window.YT.Player){ initYT(); return; }
     const s=document.createElement('script'); s.src='https://www.youtube.com/iframe_api';
     document.head.appendChild(s);
@@ -51,24 +52,28 @@
   function initYT(){
     player = new YT.Player('playerBox',{
       videoId: VIDEO_ID,
-      playerVars:{autoplay:0, playsinline:1, rel:0, modestbranding:1, mute:MUTE?1:0},
+      playerVars:{autoplay:0, rel:0, playsinline:1, modestbranding:1, mute: MUTE?1:0},
       events:{onReady:onReady, onStateChange:onState}
     });
   }
 
   function onReady(){
-    if(MUTE && player.mute) player.mute();
-    // Start video only after preroll
-    setTimeout(()=>{
-      if(AUTOPLAY && player.playVideo){
-        player.playVideo();
-      }
-      showPlayer();
-    }, PREROLL);
+    try{ if(MUTE && player.mute) player.mute(); }catch(e){}
+    if(AUTOPLAY){
+      try{ player.playVideo(); }catch(e){}
+    }
   }
 
   function onState(e){
     const S = YT.PlayerState;
+
+    if(e.data === S.PLAYING || e.data === S.BUFFERING){
+      if(!hasStarted){
+        hasStarted = true;
+        setTimeout(()=> showPlayer(), PREROLL);
+      }
+    }
+
     if(e.data === S.ENDED){
       setEnded();
     }
@@ -77,8 +82,6 @@
   showPoster();
   tick();
   setInterval(tick,1000);
-
-  // Load YT immediately (so buffering happens under poster)
-  loadYT();
+  ensureYT();
 })();
 </script>
