@@ -16,13 +16,13 @@
 </style>
 </head>
 <body>
-  <div class="stage">
-    <div class="ratio">
-      <div id="badge" class="badge">EN DIRECT</div>
-      <div id="poster" class="poster"></div>
-      <div id="playerBox" class="player hidden"></div>
-    </div>
+<div class="stage">
+  <div class="ratio">
+    <div id="badge" class="badge">EN DIRECT</div>
+    <div id="poster" class="poster"></div>
+    <div id="playerBox" class="player hidden"></div>
   </div>
+</div>
 
 <script>
 (function(){
@@ -39,9 +39,17 @@
   if (POSTER) posterEl.style.backgroundImage = `url("${POSTER}")`;
 
   let player;
+  let hasPlayed = false;
 
-  function showPoster(){ posterEl.classList.remove('hidden'); playerBox.classList.add('hidden'); }
-  function showPlayer(){ posterEl.classList.add('hidden'); playerBox.classList.remove('hidden'); }
+  function showPoster(){
+    posterEl.classList.remove('hidden');
+    playerBox.classList.add('hidden');
+  }
+
+  function showPlayer(){
+    posterEl.classList.add('hidden');
+    playerBox.classList.remove('hidden');
+  }
 
   function loadYT(){
     if(window.YT && window.YT.Player){ initYT(); return; }
@@ -53,16 +61,17 @@
 
   function initYT(){
     player = new YT.Player('playerBox',{
-      host: 'https://www.youtube-nocookie.com',
+      host:'https://www.youtube-nocookie.com',
       videoId: VIDEO_ID,
       playerVars:{
-        autoplay: AUTOPLAY ? 1 : 0,
-        playsinline: 1,
-        rel: 0,
-        modestbranding: 1,
-        controls: 1,
-        mute: MUTE ? 1 : 0,
-        origin: location.origin
+        autoplay: AUTOPLAY?1:0,
+        playsinline:1,
+        rel:0,
+        modestbranding:1,
+        controls:1,
+        mute:MUTE?1:0,
+        origin:location.origin,
+        enablejsapi:1
       },
       events:{ onReady:onReady, onStateChange:onState, onError:onError }
     });
@@ -72,23 +81,19 @@
     setTimeout(()=>{
       try{
         if(MUTE && player.mute) player.mute();
-        if (AUTOPLAY && player.playVideo) player.playVideo();
-      }catch(e){
-        showPoster();
-      }
+        if(AUTOPLAY && player.playVideo) player.playVideo();
+      }catch(e){ showPoster(); }
     }, PREROLL);
   }
 
   function onState(e){
     const S = YT.PlayerState;
-    if(e.data === S.PLAYING){ showPlayer(); }
-    if(e.data === S.BUFFERING || e.data === S.UNSTARTED){ showPoster(); }
-    if(e.data === S.ENDED){ showPoster(); }
+    if(e.data === S.PLAYING){ hasPlayed = true; showPlayer(); }
+    if(!hasPlayed && e.data === S.UNSTARTED){ showPoster(); }
+    if(e.data === S.ENDED){ hasPlayed = false; showPoster(); }
   }
 
-  function onError(){
-    showPoster();
-  }
+  function onError(){ showPoster(); }
 
   showPoster();
   loadYT();
