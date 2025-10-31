@@ -9,60 +9,25 @@
     :root{
       --u-navy:#0a1b3a;
       --u-accent:#e60000;
-      --u-light:#ffffff;
+      --u-card:#ffffff;
     }
-
-    html,body{
-      height:100%;
-      margin:0;
-      background:var(--u-navy);
-      font-family:system-ui,Arial,sans-serif;
-    }
-
-    .wrap{
-      min-height:100vh;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:16px;
-    }
-
+    html,body{height:100%;margin:0;background:var(--u-navy);font-family:system-ui,Arial,sans-serif;}
+    .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;}
     .card{
-      width:100%;
-      max-width:760px;
-      height:85vh;
-      background:#fff;
-      border-radius:16px;
-      box-shadow:0 28px 80px rgba(0,0,0,.35);
-      overflow:hidden;
-      display:flex;
-      flex-direction:column;
+      width:100%;max-width:860px;height:85vh;background:var(--u-card);
+      border-radius:16px;box-shadow:0 28px 80px rgba(0,0,0,.35);overflow:hidden;display:flex;flex-direction:column;
     }
 
     .hdr{
-      background:var(--u-navy);
-      color:#fff;
-      padding:14px 20px;
-      display:flex;
-      align-items:center;
-      gap:12px;
-      font-weight:600;
-      font-size:18px;
+      height:64px;min-height:64px;display:flex;align-items:center;gap:12px;
+      padding:0 18px;background:var(--u-navy);color:#fff;font-weight:700;letter-spacing:.2px
     }
-
-    .hdr img.logo{
-      height:28px;
-      filter:brightness(200%);
-    }
-
-    .live-badge{
-      background:var(--u-accent);
-      color:white;
-      padding:4px 10px;
-      font-size:14px;
-      border-radius:6px;
-      margin-left:auto;
-      animation:pulse 1.5s infinite;
+    .hdr .logo{height:28px;display:block;object-fit:contain;filter:brightness(200%);}
+    .hdr .title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .hdr .live-badge{
+      margin-left:auto;background:var(--u-accent);color:#fff;padding:6px 10px;border-radius:8px;
+      font-weight:700;font-size:12px;line-height:1;text-transform:uppercase;letter-spacing:.4px;
+      box-shadow:0 0 0 0 rgba(230,0,0,.7);animation:pulse 1.5s infinite
     }
 
     @keyframes pulse {
@@ -72,26 +37,20 @@
     }
 
     .pubble-app{
-      display:block;
-      height:100%;
-      width:100%;
+      display:block;height:calc(100% - 64px);width:100%;
     }
   </style>
 </head>
-
 <body>
   <div class="wrap">
     <div class="card">
       <div class="hdr">
-        <img class="logo" src="https://www.unipop.lu/wp-content/uploads/2023/01/unipop_logo_white.png">
-        <span>Live Chat</span>
+        <img class="logo" src="https://www.unipop.lu/wp-content/uploads/2025/10/Unipop_logo_white.png" alt="UniPop Logo">
+        <span class="title">Live Chat</span>
         <span class="live-badge">🔴 En direct</span>
       </div>
 
-      <div class="pubble-app PQAQ_section" 
-           data-app-id="133259" 
-           data-app-identifier="133259">
-      </div>
+      <div class="pubble-app PQAQ_section" data-app-id="133259" data-app-identifier="133259"></div>
     </div>
   </div>
 
