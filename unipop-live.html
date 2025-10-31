@@ -21,10 +21,14 @@
     <div class="ratio">
       <div id="badge" class="badge">EN DIRECT</div>
       <div id="poster" class="poster"></div>
-      <!-- Persistenter Wrapper (wird NICHT von YT ersetzt) -->
+
+      <!-- Primärer Player (YT Iframe API) -->
       <div id="playerWrap" class="wrap hidden">
         <div id="playerMount"></div>
       </div>
+
+      <!-- Fallback: direkter YouTube-Embed (ohne API) -->
+      <div id="fallbackWrap" class="wrap hidden"></div>
     </div>
   </div>
 
@@ -32,20 +36,51 @@
 (function(){
   const qs = new URLSearchParams(location.search);
   const VIDEO_ID = qs.get('video') || '';
-  const POSTER = qs.get('poster') || '';
+  const POSTER   = qs.get('poster') || '';
   const AUTOPLAY = qs.get('autoplay') === '1';
-  const MUTE = qs.get('mute') !== '0';
-  const PREROLL = Math.max(0, parseInt(qs.get('preroll') || '3000'));
+  const MUTE     = qs.get('mute') !== '0';
+  const PREROLL  = Math.max(0, parseInt(qs.get('preroll') || '3000'));
 
-  const posterEl = document.getElementById('poster');
-  const wrapEl = document.getElementById('playerWrap');
+  const posterEl   = document.getElementById('poster');
+  const playerWrap = document.getElementById('playerWrap');
+  const fallbackWrap = document.getElementById('fallbackWrap');
 
   if (POSTER) posterEl.style.backgroundImage = `url("${POSTER}")`;
 
-  let player, hasPlayed = false;
+  let player, hasPlayed = false, watchdogTimer = null;
 
-  function showPoster(){ posterEl.classList.remove('hidden'); wrapEl.classList.add('hidden'); }
-  function showPlayer(){ posterEl.classList.add('hidden'); wrapEl.classList.remove('hidden'); }
+  function showPoster(){ posterEl.classList.remove('hidden'); playerWrap.classList.add('hidden'); fallbackWrap.classList.add('hidden'); }
+  function showPlayer(){ posterEl.classList.add('hidden'); playerWrap.classList.remove('hidden'); fallbackWrap.classList.add('hidden'); }
+  function showFallback(){ posterEl.classList.add('hidden'); playerWrap.classList.add('hidden'); fallbackWrap.classList.remove('hidden'); }
+
+  // Build fallback iframe (no-cookie + permissions)
+  function mountFallback(){
+    if (fallbackWrap.firstChild) return; // already mounted
+    const u = new URL(`https://www.youtube-nocookie.com/embed/${encodeURIComponent(VIDEO_ID)}`);
+    u.searchParams.set('autoplay', AUTOPLAY ? '1' : '0');
+    u.searchParams.set('mute', MUTE ? '1' : '0');
+    u.searchParams.set('rel','0');
+    u.searchParams.set('modestbranding','1');
+    u.searchParams.set('playsinline','1');
+    u.searchParams.set('enablejsapi','1');
+
+    const ifr = document.createElement('iframe');
+    ifr.src = u.toString();
+    ifr.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+    ifr.setAttribute('allowfullscreen','');
+    fallbackWrap.appendChild(ifr);
+  }
+
+  function startWatchdog(){
+    clearTimeout(watchdogTimer);
+    // Wenn innerhalb 4,5s kein PLAYING erreicht -> Fallback
+    watchdogTimer = setTimeout(()=>{
+      if (!hasPlayed){
+        mountFallback();
+        showFallback();
+      }
+    }, 4500);
+  }
 
   function loadYT(){
     if(window.YT && window.YT.Player){ initYT(); return; }
@@ -78,22 +113,38 @@
       try{
         if(MUTE && player.mute) player.mute();
         if(AUTOPLAY && player.playVideo) player.playVideo();
-      }catch(e){ showPoster(); }
+        showPlayer();
+        startWatchdog();
+      }catch(e){
+        mountFallback();
+        showFallback();
+      }
     }, PREROLL);
   }
 
   function onState(e){
     const S = YT.PlayerState;
-    if(e.data === S.PLAYING){ hasPlayed = true; showPlayer(); }
-    if(!hasPlayed && e.data === S.UNSTARTED){ showPoster(); }
-    if(e.data === S.ENDED){ hasPlayed = false; showPoster(); }
+    if(e.data === S.PLAYING){
+      hasPlayed = true;
+      clearTimeout(watchdogTimer);
+      showPlayer();
+    }
+    if(e.data === S.ENDED){
+      hasPlayed = false;
+      showPoster();
+    }
   }
 
-  function onError(){ showPoster(); }
+  function onError(){
+    mountFallback();
+    showFallback();
+  }
 
   showPoster();
   loadYT();
 })();
 </script>
 </body>
+</html>
+
 </html>
